@@ -3,6 +3,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+import pandas as pd
 
 
 class Worten_Automation:
@@ -34,23 +36,44 @@ class Worten_Automation:
         return url
 
     def get_products(self):
-        try: # Cookies
-            accept_cookie = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(normalize-space(), 'Aceitar cookies')]")))
+        products_list= []
+
+        try:
+            accept_cookie = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(normalize-space(), 'Aceitar cookies')]"))
+            )
             if accept_cookie:
                 accept_cookie.click()
-
-        except TimeoutError:
+        except TimeoutException:
             pass
 
         try:
            cards = self.driver.find_elements(By.XPATH, "//*[contains(@class, 'product-card__content')]")
            for i in cards:
-               price = i.find_element(By.XPATH, ".//*[contains(@class, 'price__numbers')]").text
+               price = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, ".//*[contains(@class, 'price__numbers')]"))).text
+               #i.find_element(By.XPATH, ".//*[contains(@class, 'price__numbers')]").text
                price = price.replace("\n", "").replace(" ", "")
                title = i.find_element(By.CLASS_NAME, "product-card__name-and-features").text
                url = i.find_element(By.XPATH, "./ancestor::a[contains(@class, 'w-app-link')]").get_attribute("href")
-    
-            
 
+               # ADD DATA IN LIST
+               products_list.append({
+                   'Title': title,
+                   'Price': str(price),
+                   'URL': url
+               })
         except Exception as e:
             print(f"Error:\n {e}")
+
+        return products_list
+
+
+    def generate_csv(self, csv_path_out:str, filename:str):
+        data = self.get_products()
+
+        if data:
+            df = pd.DataFrame(data)
+            df.to_csv(f"{csv_path_out}\\{filename}.csv", index=False, encoding="utf-8-sig")
+            print("CSV Created Succesfully! \n")
+        else:
+            print("Empty Data, Please verify the dataset")
